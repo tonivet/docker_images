@@ -1,5 +1,5 @@
 .env
-nextcloud/
+nextcloud/nextcloud/
 mysql-data/
 models/
 output/

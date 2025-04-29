@@ -1,0 +1,60 @@
+---
+
+volumes:
+  ollama-data-share:
+    driver: local
+
+services:      
+  ollama:
+    container_name: ollama
+    hostname: ollama
+    image: ollama/ollama
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      - TZ=Europe/Sofia
+    volumes:
+      - ollama-data-share:/root/.ollama
+    networks:
+      - frontend
+    deploy:
+      resources:
+        limits:
+          cpus: '16'
+          memory: 32G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities:
+                - gpu
+
+  open-webui:
+    container_name: open-webui
+    hostname: open-webui
+    image: ghcr.io/open-webui/open-webui:main
+    restart: unless-stopped
+    stop_grace_period: 30s
+    depends_on:
+      - ollama
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - TZ=Europe/Sofia
+    volumes:
+      - /opt/ollama-webui-data:/app/backend/data
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.openwebui.rule=Host(`ai.feedmix.eu`)
+      - traefik.http.routers.openwebui.entrypoints=websecure
+      - traefik.http.routers.openwebui.tls=true
+      - traefik.http.routers.openwebui.tls.certresolver=production
+      - traefik.http.routers.openwebui.service=openwebui
+      - traefik.http.services.openwebui.loadbalancer.server.port=8080
+
+    networks:
+      - frontend
+
+networks:
+  frontend:
+  # use this flag if network is allready created
+    external: true

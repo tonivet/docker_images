@@ -1,0 +1,39 @@
+services:
+  comfyui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: comfyui
+    restart: unless-stopped
+    networks:
+      - frontend
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all  # Enable GPU usage
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1  # Adjust based on GPU requirements
+              capabilities: [gpu]
+    # runtime: nvidia  # Specify NVIDIA runtime
+    volumes:
+      - ./models:/app/models  # Mount Docker volume for shared models - Make sure it exists, or remove 'external' in volumes section
+      - ./output:/app/output # Local WSL Folder - Make sure it exists!
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.comfyui.rule=Host(`comfy.feedmix.eu`)
+      - traefik.http.routers.comfyui.entrypoints=websecure  # Ensure entrypoint matches traefik.yml
+      - traefik.http.routers.comfyui.tls=true
+      - traefik.http.routers.comfyui.tls.certresolver=production
+      - traefik.http.routers.comfyui.service=comfyui
+      - traefik.http.services.comfyui.loadbalancer.server.port=8188  # Target internal port
+
+volumes:
+  models:
+    # external: true
+
+networks:
+  frontend:
+    external: true

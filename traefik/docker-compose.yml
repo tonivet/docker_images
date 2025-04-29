@@ -1,0 +1,28 @@
+---
+
+volumes:
+  traefik-certificates:
+    driver: local
+
+services:
+  reverse-proxy:
+    image: traefik:v3.3
+    container_name: traefik
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8081:8080"
+      - "3478:3478"
+    volumes:
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - traefik-certificates:/ssl-certs
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - frontend
+    restart: unless-stopped
+
+
+networks:
+  frontend:
+  # use this flag if network is allready created
+    external: true

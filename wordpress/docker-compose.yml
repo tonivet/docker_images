@@ -1,0 +1,47 @@
+---
+
+services:
+  wordpress_db:
+    image: mariadb:latest
+    container_name: wordpress_db
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - MYSQL_DATABASE=wordpress
+    volumes:
+      - dbdata:/var/lib/mysql
+    command: '--default-authentication-plugin=mysql_native_password'
+    networks:
+      - frontend
+
+  wordpress:
+    depends_on:
+      - wordpress_db
+    image: wordpress:latest
+    container_name: wordpress
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - WORDPRESS_DB_HOST=wordpress_db:3306
+      - WORDPRESS_DB_USER=${MYSQL_USER}
+      - WORDPRESS_DB_PASSWORD=${MYSQL_PASSWORD}
+      - WORDPRESS_DB_NAME=wordpress
+    volumes:
+      - wordpress:/var/www/html
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.wordpress.rule=Host(`feedmix.eu`)
+      - traefik.http.routers.wordpress.entrypoints=websecure
+      - traefik.http.routers.wordpress.tls=true
+      - traefik.http.routers.wordpress.tls.certresolver=production
+
+    networks:
+      - frontend
+
+volumes:
+  wordpress:
+  dbdata:
+
+networks:
+  frontend:
+    external: true

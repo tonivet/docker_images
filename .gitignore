@@ -1,0 +1,5 @@
+.env
+nextcloud/
+mysql-data/
+models/
+output/

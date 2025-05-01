@@ -1,0 +1,13 @@
+---
+
+services:
+  watchtower:
+    image: containrrr/watchtower
+    command:
+      - --cleanup=true
+    # if you want to update only specific containers write it here
+      - comfyui
+    environment:
+      - WATCHTOWER_RUN_ONCE=true # watchtower will start, udpate containers it there is any updates and exit
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

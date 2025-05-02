@@ -1,0 +1,19 @@
+---
+
+services:
+  edgetts:
+    image: travisvn/openai-edge-tts:latest
+    container_name: edge-tts
+    restart: unless-stopped
+    environment:
+      - API_KEY=your_api_key_here
+      - DEFAULT_VOICE=bg-BG-KalinaNeural
+      - DEFAULT_LANGUAGE=bg-BG
+    # ports:
+    #   - "5050:5050"
+    networks:
+      - frontend
+
+networks:
+  frontend:
+    external: true

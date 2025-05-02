@@ -3,11 +3,12 @@
 services:
   watchtower:
     image: containrrr/watchtower
+    container_name: watchtower
     command:
       - --cleanup=true
-    # if you want to update only specific containers write it here
-      - comfyui
+    # if you want to update only specific container/s write it here
+      # - wordpress
     environment:
-      - WATCHTOWER_RUN_ONCE=true # watchtower will start, udpate containers it there is any updates and exit
+      - WATCHTOWER_RUN_ONCE=true # watchtower will start, udpate containers if there is any updates and exit
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

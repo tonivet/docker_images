@@ -1,0 +1,14 @@
+http:
+  routers:
+    homeassistant:
+      rule: "Host(`ha.feedmix.eu`)"
+      entryPoints:
+        - websecure
+      tls:
+        certresolver: production
+      service: homeassistant
+  services:
+    homeassistant:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.8:8123"

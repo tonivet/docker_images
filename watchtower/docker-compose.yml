@@ -7,7 +7,7 @@ services:
     command:
       - --cleanup=true
     # if you want to update only specific container/s write it here
-      # - wordpress
+      # - open-webui
     environment:
       - WATCHTOWER_RUN_ONCE=true # watchtower will start, udpate containers if there is any updates and exit
     volumes:

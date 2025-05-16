@@ -4,3 +4,4 @@ mysql-data/
 models/
 output/
 whisper/
+config/

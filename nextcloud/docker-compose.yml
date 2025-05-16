@@ -34,13 +34,14 @@ services:
         init: true
         env_file: .env
         environment:
-          - NC_DOMAIN=nc.feedmix.eu
-          - TALK_HOST=signaling.feedmix.eu
-          - TALK_PORT=3478
-          - TURN_SECRET=${TURN_SECRET_KEY} #this must be a long secretpasswordkey
-          - SIGNALING_SECRET=${SIGNALING_SECRET_KEY} #this must be a long secretpasswordkey
-          - INTERNAL_SECRET=${INTERNAL_SECRET_KEY} #this must be a long secretpasswordkey
-          - TZ=Europe/Sofia
+            - NC_DOMAIN=nc.feedmix.eu
+            - TALK_HOST=signaling.feedmix.eu
+            - TALK_PORT=3478
+            - TURN_SECRET=${TURN_SECRET_KEY} #this must be a long secretpasswordkey
+            - SIGNALING_SECRET=${SIGNALING_SECRET_KEY} #this must be a long secretpasswordkey
+            - INTERNAL_SECRET=${INTERNAL_SECRET_KEY} #this must be a long secretpasswordkey
+            - TZ=Europe/Sofia
+            - TRUSTED_PROXIES=172.18.0.0/16
         labels:
             - 'traefik.enable=true'
             - 'traefik.http.routers.nextcloud-talk.tls=true'
@@ -55,6 +56,7 @@ services:
             - 'traefik.tcp.routers.nextcloud.tls.certresolver=production'
             - "traefik.tcp.routers.nextcloud.entrypoints= nc-talk"
             - 'traefik.tcp.routers.nextcloud.rule=HostSNI(`*`)'
+            # - 'traefik.tcp.routers.nextcloud.rule=HostSNIRegexp(`^.+\.feedmix\.eu$`)'
             - "traefik.tcp.routers.nextcloud.tls.domains[0].main=nc.feedmix.eu"
             - "traefik.tcp.routers.nextcloud.tls.domains[0].sans=nc.feedmix.eu"
             - "traefik.tcp.routers.nextcloud.service=nextcloud"
@@ -103,6 +105,7 @@ services:
             - MYSQL_USER=nextcloud # MYSQL USERNAME
             - MYSQL_PASSWORD=${MYSQL_PASSWORD} # PASSWORD OF MYSQL USER
             - MYSQL_DATABASE=nextcloud # MYSQL DATABASE
+            - PHP_OPCACHE_MEMORY_CONSUMPTION=256
             - TRUSTED_PROXIES=172.18.0.0/16
             - OVERWRITEPROTOCOL=https
         volumes:

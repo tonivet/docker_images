@@ -13,6 +13,7 @@ services:
     stop_grace_period: 30s
     environment:
       - TZ=Europe/Sofia
+      - OLLAMA_FLASH_ATTENTION=true
     volumes:
       - ollama-data-share:/root/.ollama
     networks:

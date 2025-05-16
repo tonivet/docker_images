@@ -15,6 +15,7 @@ services:
       - "3478:3478"
     volumes:
       - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./config.yml:/etc/traefik/config.yml:ro
       - traefik-certificates:/ssl-certs
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:

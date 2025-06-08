@@ -5,3 +5,5 @@ models/
 output/
 whisper/
 config/
+piper-data/
+whisper-data/

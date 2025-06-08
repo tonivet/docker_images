@@ -18,6 +18,8 @@ services:
       - ollama-data-share:/root/.ollama
     networks:
       - frontend
+    ports:
+      - 11434:11434
     deploy:
       resources:
         limits:

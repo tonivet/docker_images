@@ -1,0 +1,47 @@
+---
+
+services:
+  wyoming-piper:
+    image: rhasspy/wyoming-piper
+    ports:
+      - 10200:10200
+    volumes:
+      - "./piper-data:/data"
+    command: --voice en_US-lessac-medium
+    restart: unless-stopped
+    networks:
+      - wyoming
+
+  wyoming-whisper:
+    image: rhasspy/wyoming-whisper
+    ports:
+      - 10300:10300
+    volumes:
+      - "./whisper-data:/data"
+    restart: unless-stopped
+    command: --model medium-int8 --language en  # --beam-size 5 --device cuda
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '16'
+    #       memory: 32G
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities:
+    #             - gpu
+    networks:
+      - wyoming
+  
+  wyoming-openwakeword:
+    image: rhasspy/wyoming-openwakeword
+    ports:
+      - 10400:10400
+    restart: unless-stopped
+    networks:
+      - wyoming
+
+networks:
+  wyoming:
+    external: true

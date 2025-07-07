@@ -1,0 +1,7 @@
+__pycache__/
+.env
+.env*
+.gitignore
+Pipfile
+Pipfile.lock
+db.sqlite3

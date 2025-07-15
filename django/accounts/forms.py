@@ -2,6 +2,8 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django import forms
 
+from .models import UserProfile
+
 class SignUpForm(UserCreationForm):
     first_name = forms.CharField(label="First name", max_length=55, widget=forms.TextInput(attrs={'class':'form-control '}))
     last_name = forms.CharField(label="Last name", max_length=55, widget=forms.TextInput(attrs={'class':'form-control'}))
@@ -31,3 +33,13 @@ class UserUpdateForm(forms.ModelForm):
     class Meta:
         model = User
         fields = ['first_name', 'last_name', 'email']
+
+
+class UserProfileUpdateForm(forms.ModelForm):
+    sex = forms.ChoiceField(choices=UserProfile.SEX_CHOICES, required=False)
+    city = forms.CharField(required=False)
+    country = forms.CharField(required=False)
+    class Meta:
+        model = UserProfile
+        fields = ['image', 'sex', 'city', 'country']
+

@@ -6,7 +6,8 @@ services:
       - "8000:8000"
     environment:
       PIPELINE: ${PIPELINE}
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      HOST_URL: ${HOST_URL}
+      SECRET_KEY: ${SECRET_KEY}
       EMAIL_HOST_USER: ${EMAIL_HOST_USER}
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
     env_file: ".env"
@@ -15,7 +16,7 @@ services:
       - traefik.http.routers.django.rule=Host(`django.feedmix.eu`)
       - traefik.http.routers.django.entrypoints=websecure
       - traefik.http.routers.django.tls=true
-      - traefik.http.routers.django.tls.certresolver=productio
+      - traefik.http.routers.django.tls.certresolver=production
     networks:
       - frontend
 

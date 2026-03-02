@@ -1,0 +1,47 @@
+services:
+  db:
+    image: library/mariadb:10.3
+    env_file: .env
+    environment:
+      - MYSQL_RANDOM_ROOT_PASSWORD=true
+      - MYSQL_DATABASE="passbolt"
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - database_volume:/var/lib/mysql
+    restart: unless-stopped
+    networks:
+      - frontend
+  passbolt:
+    image: passbolt/passbolt:latest-ce
+    depends_on:
+      - db
+    env_file: .env
+    environment:
+      - APP_FULL_BASE_URL=${APP_FULL_BASE_URL}
+      - DATASOURCES_DEFAULT_HOST=db
+      - DATASOURCES_DEFAULT_USERNAME=${DATASOURCES_DEFAULT_USERNAME}
+      - DATASOURCES_DEFAULT_PASSWORD=${DATASOURCES_DEFAULT_PASSWORD}
+      - DATASOURCES_DEFAULT_DATABASE="passbolt"
+    volumes:
+      - gpg_volume:/etc/passbolt/gpg
+      - jwt_volume:/etc/passbolt/jwt
+    command: ["/usr/bin/wait-for.sh", "-t", "0", "db:3306", "--", "/docker-entrypoint.sh"]
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.passbolt.rule=Host(`pass.feedmix.eu`)
+      - traefik.http.routers.passbolt.entrypoints=websecure
+      - traefik.http.routers.passbolt.tls=true
+      - traefik.http.routers.passbolt.tls.certresolver=production
+    networks:
+      - frontend
+
+volumes:
+  database_volume:
+  gpg_volume:
+  jwt_volume:
+
+networks:
+  frontend:
+    external: true

@@ -108,6 +108,9 @@ services:
             - PHP_OPCACHE_MEMORY_CONSUMPTION=256
             - TRUSTED_PROXIES=172.18.0.0/16
             - OVERWRITEPROTOCOL=https
+            - APACHE_BODY_LIMIT=0
+            - PHP_UPLOAD_LIMIT=16G
+            - PHP_MEMORY_LIMIT=2G
         volumes:
             - ./nextcloud:/var/www/html
         labels:

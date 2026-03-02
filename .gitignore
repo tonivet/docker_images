@@ -8,3 +8,4 @@ config/
 piper-data/
 whisper-data/
 django/
+vw-data/

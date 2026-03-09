@@ -20,23 +20,22 @@ entryPoints:
           permanent: true
   websecure:
     address: ":443"
-  nc-talk:
-    address: ":3478"
-  nc-udp:
-    address: ":3478/udp"
-
+    # allow uploding big files
+    transport:
+      respondingTimeouts:
+        readTimeout: 24h
 
 certificatesResolvers:
   staging:
     acme:
-      email: tonivet@gmail.com
+      email: ${EMAIL} # ADD YOUR EMAIL HERE
       storage: /ssl-certs/acme.json
       caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
       httpChallenge:
         entryPoint: web
   production:
     acme:
-      email: tonivet@gmail.com
+      email: ${EMAIL} # ADD YOUR EMAIL HERE
       storage: /ssl-certs/acme.json
       caServer: "https://acme-v02.api.letsencrypt.org/directory"
       httpChallenge:

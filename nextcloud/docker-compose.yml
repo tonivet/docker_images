@@ -26,48 +26,6 @@ services:
             - redis_data:/data
         networks:
             - frontend
-
-    nextcloud-talk:
-        image: nextcloud/aio-talk:latest
-        container_name: nextcloud-talk
-        restart: unless-stopped
-        init: true
-        env_file: .env
-        environment:
-            - NC_DOMAIN=nc.feedmix.eu
-            - TALK_HOST=signaling.feedmix.eu
-            - TALK_PORT=3478
-            - TURN_SECRET=${TURN_SECRET_KEY} #this must be a long secretpasswordkey
-            - SIGNALING_SECRET=${SIGNALING_SECRET_KEY} #this must be a long secretpasswordkey
-            - INTERNAL_SECRET=${INTERNAL_SECRET_KEY} #this must be a long secretpasswordkey
-            - TZ=Europe/Sofia
-            - TRUSTED_PROXIES=172.18.0.0/16
-        labels:
-            - 'traefik.enable=true'
-            - 'traefik.http.routers.nextcloud-talk.tls=true'
-            - 'traefik.http.routers.nextcloud-talk.tls.certresolver=production'
-            - 'traefik.http.routers.nextcloud-talk.entrypoints=websecure'
-            - 'traefik.http.routers.nextcloud-talk.rule=Host(`signaling.feedmix.eu`)'
-            - 'traefik.http.routers.nextcloud-talk.service=nextcloud-talk'
-            - 'traefik.http.services.nextcloud-talk.loadbalancer.server.port=8081'
-
-            - 'traefik.tcp.routers.nextcloud.tls=true'
-            - "traefik.tcp.routers.nextcloud.tls.passthrough=true"
-            - 'traefik.tcp.routers.nextcloud.tls.certresolver=production'
-            - "traefik.tcp.routers.nextcloud.entrypoints= nc-talk"
-            - 'traefik.tcp.routers.nextcloud.rule=HostSNI(`*`)'
-            # - 'traefik.tcp.routers.nextcloud.rule=HostSNIRegexp(`^.+\.feedmix\.eu$`)'
-            - "traefik.tcp.routers.nextcloud.tls.domains[0].main=nc.feedmix.eu"
-            - "traefik.tcp.routers.nextcloud.tls.domains[0].sans=nc.feedmix.eu"
-            - "traefik.tcp.routers.nextcloud.service=nextcloud"
-            - "traefik.tcp.services.nextcloud.loadbalancer.server.port=3478"
-
-            - 'traefik.udp.routers.nextcloud.entrypoints=nc-udp'
-            - "traefik.udp.routers.nextcloud.service=nextcloud"
-            - "traefik.udp.services.nextcloud.loadbalancer.server.port=3478"
-
-        networks:
-          - frontend
     
     collabora:
         image: collabora/code
@@ -90,27 +48,29 @@ services:
         networks:
             - frontend
 
-
     nextcloud-app:
-        image: nextcloud
+        image: nextcloud:latest
         container_name: nextcloud-app
         restart: unless-stopped
         depends_on:
             - nextcloud-db
             - nextcloud-redis
         environment:
-            - REDIS_HOST=nextcloud-redis
+            - REDIS_HOST=nextcloud-redis # REDIS CONTAINER NAME
             - REDIS_HOST_PASSWORD=${REDIS_PASSWORD} # REPLACE WITH REDIS PASSWORD
-            - MYSQL_HOST=nextcloud-db
+            - MYSQL_HOST=nextcloud-db # MYSQL DATABASE
             - MYSQL_USER=nextcloud # MYSQL USERNAME
             - MYSQL_PASSWORD=${MYSQL_PASSWORD} # PASSWORD OF MYSQL USER
             - MYSQL_DATABASE=nextcloud # MYSQL DATABASE
-            - PHP_OPCACHE_MEMORY_CONSUMPTION=256
-            - TRUSTED_PROXIES=172.18.0.0/16
+            - TRUSTED_PROXIES=172.18.0.0/16 # CHANGE TO YOUR NETWORK IP ADDRESS
             - OVERWRITEPROTOCOL=https
+            # ALLOW UPLOAD OF BIG FILES
+            # IF YOU'RE USING REVERSE PROXY AS TRAEFIK CHANGE SETTINGS AND THERE 
             - APACHE_BODY_LIMIT=0
+            - PHP_OPCACHE_MEMORY_CONSUMPTION=256
             - PHP_UPLOAD_LIMIT=16G
             - PHP_MEMORY_LIMIT=2G
+
         volumes:
             - ./nextcloud:/var/www/html
         labels:
@@ -119,19 +79,22 @@ services:
             - 'traefik.http.routers.nextcloud.tls.certresolver=production'
             - 'traefik.http.routers.nextcloud.entrypoints=websecure'
             - 'traefik.http.routers.nextcloud.rule=Host(`nc.feedmix.eu`)'
-            - 'traefik.http.routers.nextcloud.middlewares=nextcloud-dav,nextcloud-header'
 
             - 'traefik.http.middlewares.nextcloud-dav.redirectRegex.regex=https://(.*)/.well-known/(card|cal)dav'
             - 'traefik.http.middlewares.nextcloud-dav.redirectRegex.replacement=https://$${1}/remote.php/dav/'
             - 'traefik.http.middlewares.nextcloud-dav.redirectRegex.permanent=true'
 
             - 'traefik.http.middlewares.nextcloud-header.headers.referrerPolicy=no-referrer'
-            - 'traefik.http.middlewares.nextcloud-header.headers.stsSeconds=15552000'
-            - 'traefik.http.middlewares.nextcloud-header.headers.forceSTSHeader=true'
-            - 'traefik.http.middlewares.nextcloud-header.headers.stsPreload=true'
-            - 'traefik.http.middlewares.nextcloud-header.headers.stsIncludeSubdomains=true'
             - 'traefik.http.middlewares.nextcloud-header.headers.browserXssFilter=true'
             - 'traefik.http.middlewares.nextcloud-header.headers.customRequestHeaders.X-Forwarded-Proto=https'
+            
+            - 'traefik.http.middlewares.nextcloud-header.headers.stsSeconds=15552000'
+            - 'traefik.http.middlewares.nextcloud-header.headers.stsIncludeSubdomains=true'
+            - 'traefik.http.middlewares.nextcloud-header.headers.stsPreload=true'
+            - 'traefik.http.middlewares.nextcloud-header.headers.forceSTSHeader=true'
+
+            - 'traefik.http.routers.nextcloud.middlewares=nextcloud-dav,nextcloud-header@docker'
+
         networks:
             - frontend
 
@@ -140,4 +103,4 @@ volumes:
 
 networks:
   frontend:
-    external: true
+    external: true # IF NETWORK ALLREADY EXISTS

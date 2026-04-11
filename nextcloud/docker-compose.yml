@@ -68,6 +68,35 @@ services:
         networks:
             - frontend
 
+    nextcloud-talk:
+    #   image: nextcloud/aio-talk:latest
+      image: ghcr.io/nextcloud-releases/aio-talk:beta
+      init: true
+      container_name: nextcloud-talk
+      hostname: nextcloud-talk
+      restart: unless-stopped
+      ports:
+        - 3478:3478/tcp #SHOULD BE OPEN ON FIREWALL AND ROUTER
+        - 3478:3478/udp
+      environment:
+        - NC_DOMAIN=nc.feedmix.eu
+        - TALK_HOST=signaling.feedmix.eu
+        - TURN_SECRET=${TURN_SECRET_KEY}
+        - SIGNALING_SECRET=${SIGNALING_SECRET_KEY}
+        - TZ=${TIMEZONE}
+        - TALK_PORT=3478
+        - INTERNAL_SECRET=${INTERNAL_SECRET_KEY}
+      labels:
+        - 'traefik.enable=true'
+        - 'traefik.http.routers.nextcloud-talk.tls=true'
+        - 'traefik.http.routers.nextcloud-talk.tls.certresolver=production'
+        - 'traefik.http.routers.nextcloud-talk.entrypoints=websecure'
+        - 'traefik.http.routers.nextcloud-talk.rule=Host(`signaling.feedmix.eu`)'
+        - 'traefik.http.routers.nextcloud-talk.service=nextcloud-talk'
+        - 'traefik.http.services.nextcloud-talk.loadbalancer.server.port=8081'
+      networks:
+        - frontend
+
     nextcloud-app:
         build: .
         container_name: nextcloud-app

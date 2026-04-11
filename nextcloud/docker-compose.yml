@@ -33,10 +33,11 @@ services:
         restart: unless-stopped
         env_file: .env
         environment:
+            - dictionaries=bg_BG en_GB
             - domain=nextcloud-app
             - username=${COLLABORA_USERNAME}
             - password=${COLLABORA_PASSWORD}
-            - extra_params=--o:ssl.enable=false --o:ssl.termination=true
+            - extra_params=--o:ssl.enable=false --o:ssl.termination=true --o:lang=bg_BG
         labels:
             - 'traefik.enable=true'
             - 'traefik.http.routers.collabora.tls=true'
@@ -48,8 +49,27 @@ services:
         networks:
             - frontend
 
+    fulltextsearch:
+        image: nextcloud/aio-fulltextsearch:latest
+        container_name: nextcloud-fulltextsearch
+        environment:
+            - TZ=${TIMEZONE}
+            - ES_JAVA_OPTS=-Xms1G -Xmx1G
+            - bootstrap.memory_lock=true
+            - cluster.name=nextcloud-aio
+            - discovery.type=single-node
+            - logger.org.elasticsearch.discovery=WARN
+            - http.port=9200
+            - xpack.license.self_generated.type=basic
+            - xpack.security.enabled=false
+        volumes:
+            - ./elasticsearch:/usr/share/elasticsearch/data:rw
+        restart: unless-stopped
+        networks:
+            - frontend
+
     nextcloud-app:
-        image: nextcloud:latest
+        build: .
         container_name: nextcloud-app
         restart: unless-stopped
         depends_on:
@@ -70,6 +90,7 @@ services:
             - PHP_OPCACHE_MEMORY_CONSUMPTION=256
             - PHP_UPLOAD_LIMIT=16G
             - PHP_MEMORY_LIMIT=2G
+            - NEXTCLOUD_ENABLE_NVIDIA_GPU=true
 
         volumes:
             - ./nextcloud:/var/www/html

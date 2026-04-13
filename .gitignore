@@ -13,3 +13,4 @@ whisper/
 whisper-data/
 .openclaw/
 elasticsearch/
+certs/

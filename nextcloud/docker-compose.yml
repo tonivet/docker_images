@@ -57,6 +57,7 @@ services:
 # test instalation by running in console "php /var/www/html/occ fulltextsearch:test" 
 # if everything is ok than make first indexing by running "php /var/www/html/occ fulltextsearch:index"
 # after that you can uncomment in "start_fulltextsearch_live.sh" lines "php /var/www/html/occ fulltextsearch:stop" and "php /var/www/html/occ fulltextsearch:live"
+# see https://github.com/nextcloud/fulltextsearch/wiki/Basic-Installation
 
     fulltextsearch:
         image: nextcloud/aio-fulltextsearch:latest
@@ -76,6 +77,25 @@ services:
         restart: unless-stopped
         networks:
             - frontend
+    
+# makes possible to install in nextcloud external apps from docker containers 
+# installation https://github.com/nextcloud/HaRP?tab=readme-ov-file#how-to-install-it
+    nextcloud-appapi-harp:
+        image: ghcr.io/nextcloud/nextcloud-appapi-harp:release
+        container_name: nextcloud-appapi-harp
+        hostname: nextcloud-appapi-harp
+        restart: unless-stopped
+        # ports:
+        #   - "8780:8780"
+        #   - "8782:8782"
+        environment:
+          HP_SHARED_KEY: ${HP_SHARED_KEY}
+          NC_INSTANCE_URL: ${NC_DOMAIN}
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+          - ./certs:/certs
+        networks:
+          - frontend
 
     nextcloud-talk:
     #   image: nextcloud/aio-talk:latest

@@ -14,3 +14,4 @@ whisper-data/
 .openclaw/
 elasticsearch/
 certs/
+notify_push_install/

@@ -52,6 +52,24 @@ services:
         networks:
             - frontend
 
+    whiteboard:
+      image: ghcr.io/nextcloud-releases/whiteboard:stable
+      container_name: nextcloud-whiteboard
+      restart: unless-stopped
+      environment:
+        - NEXTCLOUD_URL=${NC_DOMAIN}
+        - JWT_SECRET_KEY=${WHITEBOARD_SECRET_KEY}  # Generate with: openssl rand -hex 32
+        - STORAGE_STRATEGY=lru
+        - MAX_UPLOAD_FILE_SIZE=50
+      networks:
+        - frontend
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.nextcloud-whiteboard.tls.certresolver=production"
+        - "traefik.http.routers.nextcloud-whiteboard.entrypoints=websecure"
+        - "traefik.http.routers.nextcloud-whiteboard.rule=Host(`${WHITEBOARD_DOMAIN}`)"
+        - "traefik.http.services.nextcloud-whiteboard.loadbalancer.server.port=3002"
+
 # install nextcloud apps: "Full text search", "Full text search - Elasticsearch Platform", "Full text search - Files"
 # configure settings in Administration -> Full text search. For "Address of the Servlet" add "http://nextcloud-fulltextsearch:9200"
 # test instalation by running in console "php /var/www/html/occ fulltextsearch:test" 
@@ -126,6 +144,33 @@ services:
       networks:
         - frontend
 
+## review config
+# docker compose exec app php occ config:system:get enabledPreviewProviders
+
+# #enable imaginary
+# docker compose exec app php occ config:system:set enabledPreviewProviders 0 --value 'OC\Preview\TXT'
+# docker compose exec app php occ config:system:set enabledPreviewProviders 1 --value 'OC\Preview\MarkDown'
+# docker compose exec app php occ config:system:set enabledPreviewProviders 2 --value 'OC\Preview\MP3'
+# docker compose exec app php occ config:system:set enabledPreviewProviders 3 --value 'OC\Preview\OpenDocument'
+# docker compose exec app php occ config:system:set enabledPreviewProviders 4 --value 'OC\Preview\Krita'
+# docker compose exec app php occ config:system:set enabledPreviewProviders 5 --value 'OC\Preview\Imaginary'
+# docker compose exec app php occ config:system:set enabledPreviewProviders 6 --value 'OC\Preview\ImaginaryPDF'
+# docker compose exec app php occ config:system:set preview_imaginary_url --value 'http://nextcloud-imaginary:9000'
+
+# # limit number of parallel jobs (adopt to your CPU core number)
+# docker compose exec app php occ config:system:set preview_concurrency_all --value 12
+# docker compose exec app php occ config:system:set preview_concurrency_new --value 8
+
+    imaginary:
+        image: nextcloud/aio-imaginary:latest
+        container_name: nextcloud-imaginary
+        environment:
+            - PORT=9000
+        command: -concurrency 50 -enable-url-source -log-level info
+        restart: always
+        networks:
+          - frontend
+
     nextcloud-app:
         build: .
         container_name: nextcloud-app
@@ -136,10 +181,17 @@ services:
         environment:
             - REDIS_HOST=nextcloud-redis # REDIS CONTAINER NAME
             - REDIS_HOST_PASSWORD=${REDIS_PASSWORD} # REPLACE WITH REDIS PASSWORD
+
             - MYSQL_HOST=nextcloud-db # MYSQL DATABASE
             - MYSQL_USER=nextcloud # MYSQL USERNAME
             - MYSQL_PASSWORD=${MYSQL_PASSWORD} # PASSWORD OF MYSQL USER
             - MYSQL_DATABASE=nextcloud # MYSQL DATABASE
+
+            - POSTGRES_HOST=nextcloud-pg
+            - POSTGRES_USER=nextcloud
+            - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            - POSTGRES_DB=nextcloud
+
             - TRUSTED_PROXIES=172.18.0.0/16 # CHANGE TO YOUR DOCKER NETWORK IP ADDRESS
             - OVERWRITEPROTOCOL=https
             # ALLOW UPLOAD OF BIG FILES
@@ -180,6 +232,8 @@ services:
 volumes:
     redis_data:
     elasticsearch:
+    apps:
+    config:
 
 networks:
   frontend:

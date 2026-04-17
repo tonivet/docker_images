@@ -4,7 +4,7 @@ services:
     nextcloud-db:
         image: mariadb:11.4
         container_name: nextcloud-db
-        command: --transaction-isolation=READ-COMMITTED --log-bin=ROW --skip-innodb-read-only-compressed
+        command: --transaction-isolation=READ-COMMITTED --log-bin=ROW --skip-innodb-read-only-compressed --log_bin_trust_function_creators=true
         restart: unless-stopped
         volumes:
             - ./mysql-data:/var/lib/mysql
@@ -57,7 +57,7 @@ services:
       container_name: nextcloud-whiteboard
       restart: unless-stopped
       environment:
-        - NEXTCLOUD_URL=${NC_DOMAIN}
+        - NEXTCLOUD_URL=https://${NC_DOMAIN}
         - JWT_SECRET_KEY=${WHITEBOARD_SECRET_KEY}  # Generate with: openssl rand -hex 32
         - STORAGE_STRATEGY=lru
         - MAX_UPLOAD_FILE_SIZE=50
@@ -65,9 +65,11 @@ services:
         - frontend
       labels:
         - "traefik.enable=true"
+        - 'traefik.http.routers.nextcloud-whiteboard.tls=true'
         - "traefik.http.routers.nextcloud-whiteboard.tls.certresolver=production"
         - "traefik.http.routers.nextcloud-whiteboard.entrypoints=websecure"
         - "traefik.http.routers.nextcloud-whiteboard.rule=Host(`${WHITEBOARD_DOMAIN}`)"
+        - 'traefik.http.routers.nextcloud-whiteboard.service=nextcloud-whiteboard'
         - "traefik.http.services.nextcloud-whiteboard.loadbalancer.server.port=3002"
 
 # install nextcloud apps: "Full text search", "Full text search - Elasticsearch Platform", "Full text search - Files"
@@ -175,6 +177,7 @@ services:
         build: .
         container_name: nextcloud-app
         restart: unless-stopped
+        gpus: all
         depends_on:
             - nextcloud-db
             - nextcloud-redis

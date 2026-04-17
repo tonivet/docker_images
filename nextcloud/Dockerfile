@@ -1,10 +1,12 @@
 FROM nextcloud:latest
 
 # Install supervisor to start multiple processes on container startup
+# https://pkgs.alpinelinux.org/packages
 RUN apt-get update \
     && apt-get install -y  \
       supervisor \
       vim \
+      ffmpeg \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 

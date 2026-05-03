@@ -6,7 +6,7 @@ volumes:
 
 services:
   reverse-proxy:
-    image: traefik:v3.3
+    image: traefik:latest
     container_name: traefik
     ports:
       - "80:80"

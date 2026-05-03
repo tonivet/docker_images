@@ -1,0 +1,19 @@
+---
+
+# https://docs.nextcloud.com/server/stable/admin_manual/configuration_server/antivirus_configuration.html
+services:
+  clamav:
+    image: "clamav/clamav:stable_base"
+    container_name: "clamav"
+    volumes:
+      # Socket
+      - /var/run/clamav/:/var/run/clamav/
+      # Virus DB
+      - /var/docker/clamav/virus_db/:/var/lib/clamav/
+    restart: unless-stopped
+    networks:
+      - frontend
+
+networks:
+  frontend:
+    external: true

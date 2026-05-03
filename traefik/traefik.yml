@@ -24,6 +24,10 @@ entryPoints:
     transport:
       respondingTimeouts:
         readTimeout: 24h
+    # telling traeifk to trust only X-Forwarded-* headers coming from Docker network 172.18.0.0/16
+    forwardedHeaders:
+      trustedIPs:
+        - "172.18.0.0/16"
 
 certificatesResolvers:
   staging:

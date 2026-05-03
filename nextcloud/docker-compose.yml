@@ -26,21 +26,107 @@ services:
             - redis_data:/data
         networks:
             - frontend
+
+    nextcloud-notify-push:
+        image: nextcloud:apache
+        container_name: nextcloud-notify-push
+        restart: always
+        depends_on:
+          - nextcloud-db
+          - nextcloud-redis
+          - nextcloud-app
+        environment:
+          - NEXTCLOUD_URL=http://nextcloud-app
+          - REDIS_HOST=nextcloud-redis
+          - REDIS_HOST_PASSWORD=${REDIS_PASSWORD}
+          - PORT=7867
+        volumes:
+          - ./nextcloud:/var/www/html:ro
+        networks:
+            - frontend
+        entrypoint: >
+          /var/www/html/custom_apps/notify_push/bin/x86_64/notify_push
+          /var/www/html/config/config.php
+        labels:
+          - traefik.enable=true
+          - traefik.http.routers.notify_push.tls=true
+          - traefik.http.routers.notify_push.tls.certresolver=production
+          - traefik.http.routers.notify_push.entrypoints=websecure
+          - traefik.http.routers.notify_push.rule=Host(`push.${NC_DOMAIN}`)
+          - traefik.http.routers.notify_push.priority=1000
+          - traefik.http.routers.notify_push.service=notify_push
+          - traefik.http.services.notify_push.loadbalancer.server.port=7867
+
+    nextcloud-app:
+        build: .
+        container_name: nextcloud-app
+        restart: unless-stopped
+        gpus: all
+        depends_on:
+            - nextcloud-db
+            - nextcloud-redis
+        environment:
+            - REDIS_HOST=nextcloud-redis # REDIS CONTAINER NAME
+            - REDIS_HOST_PASSWORD=${REDIS_PASSWORD} # REPLACE WITH REDIS PASSWORD
+
+            - MYSQL_HOST=nextcloud-db # MYSQL DATABASE
+            - MYSQL_USER=nextcloud # MYSQL USERNAME
+            - MYSQL_PASSWORD=${MYSQL_PASSWORD} # PASSWORD OF MYSQL USER
+            - MYSQL_DATABASE=nextcloud # MYSQL DATABASE
+
+            - TRUSTED_PROXIES=172.18.0.0/16 # CHANGE TO YOUR DOCKER NETWORK IP ADDRESS
+            - OVERWRITEPROTOCOL=https
+            # ALLOW UPLOAD OF BIG FILES
+            # IF YOU'RE USING REVERSE PROXY AS TRAEFIK CHANGE SETTINGS AND THERE 
+            - APACHE_BODY_LIMIT=0
+            - PHP_OPCACHE_MEMORY_CONSUMPTION=256
+            - PHP_UPLOAD_LIMIT=16G
+            - PHP_MEMORY_LIMIT=2G
+            - NEXTCLOUD_ENABLE_NVIDIA_GPU=true
+        volumes:
+            - ./nextcloud:/var/www/html
+        networks:
+            - frontend
+        labels:
+            - 'traefik.enable=true'
+            - 'traefik.http.routers.nextcloud.tls=true'
+            - 'traefik.http.routers.nextcloud.tls.certresolver=production'
+            - 'traefik.http.routers.nextcloud.entrypoints=websecure'
+            - 'traefik.http.routers.nextcloud.rule=Host(`${NC_DOMAIN}`)'
+
+            - 'traefik.http.middlewares.nextcloud-dav.redirectRegex.regex=https://(.*)/.well-known/(card|cal)dav'
+            - 'traefik.http.middlewares.nextcloud-dav.redirectRegex.replacement=https://$${1}/remote.php/dav/'
+            - 'traefik.http.middlewares.nextcloud-dav.redirectRegex.permanent=true'
+
+            - 'traefik.http.middlewares.nextcloud-header.headers.referrerPolicy=no-referrer'
+            - 'traefik.http.middlewares.nextcloud-header.headers.browserXssFilter=true'
+            - 'traefik.http.middlewares.nextcloud-header.headers.customRequestHeaders.X-Forwarded-Proto=https'
+            
+            - 'traefik.http.middlewares.nextcloud-header.headers.stsSeconds=15552000'
+            - 'traefik.http.middlewares.nextcloud-header.headers.stsIncludeSubdomains=true'
+            - 'traefik.http.middlewares.nextcloud-header.headers.stsPreload=true'
+            - 'traefik.http.middlewares.nextcloud-header.headers.forceSTSHeader=true'
+
+            - 'traefik.http.routers.nextcloud.middlewares=nextcloud-dav,nextcloud-header'
     
     collabora:
         image: collabora/code
         container_name: collabora
         restart: unless-stopped
         env_file: .env
+        cap_add:
+            - MKNOD
+            - SYS_ADMIN
+        security_opt:
+            - apparmor:unconfined
         environment:
-            - dictionaries=bg_BG en_GB # costumes dictionaries for spell check
-            - domain=nextcloud-app
+            - domain=${NC_DOMAIN}
+            - dictionaries=bg_BG en_US en_GB # costumes dictionaries for spell check
             - username=${COLLABORA_USERNAME} # ADD COLLABORA USERNAME IN .env FILE
             - password=${COLLABORA_PASSWORD} # ADD COLLABORA PASSWORD IN .env FILE
-            - extra_params=
-                --o:ssl.enable=false
-                --o:ssl.termination=true 
-                --o:lang=bg_BG 
+            - extra_params=--o:ssl.enable=false --o:ssl.termination=true --o:lang=bg_BG 
+        networks:
+            - frontend
         labels:
             - 'traefik.enable=true'
             - 'traefik.http.routers.collabora.tls=true'
@@ -49,8 +135,10 @@ services:
             - 'traefik.http.routers.collabora.rule=Host(`${COLLABORA_DOMAIN}`)'
             - 'traefik.http.routers.collabora.service=collabora'
             - 'traefik.http.services.collabora.loadbalancer.server.port=9980'
-        networks:
-            - frontend
+
+            - traefik.http.middlewares.collabora-headers.headers.customrequestheaders.X-Forwarded-Proto=https
+            - traefik.http.middlewares.collabora-headers.headers.customrequestheaders.X-Forwarded-Host=${COLLABORA_DOMAIN}
+            - traefik.http.routers.collabora.middlewares=collabora-headers
 
     whiteboard:
       image: ghcr.io/nextcloud-releases/whiteboard:stable
@@ -82,6 +170,7 @@ services:
     fulltextsearch:
         image: nextcloud/aio-fulltextsearch:latest
         container_name: nextcloud-fulltextsearch
+        restart: unless-stopped
         environment:
             - TZ=${TIMEZONE}
             - ES_JAVA_OPTS=-Xms1G -Xmx1G # Allocates 1 GB RAM minimum and maximum to Elasticsearch.
@@ -94,7 +183,6 @@ services:
             - xpack.security.enabled=false
         volumes:
             - elasticsearch:/usr/share/elasticsearch/data:rw
-        restart: unless-stopped
         networks:
             - frontend
     
@@ -129,12 +217,14 @@ services:
         - 3478:3478/udp
       environment:
         - NC_DOMAIN=${NC_DOMAIN} # ADD NEXTCLOUD DOMAIN IN .env FILE
+        - TZ=${TIMEZONE} # ADD YOUR TIME ZONE IN .env. FILE
         - TALK_HOST=${SIGNALING_DOMAIN} # ADD SIGNALING SUB DOMAIN IN .env FILE
         - TURN_SECRET=${TURN_SECRET_KEY} # ADD YOUR TURN SECRET KEY IN .env FILE
         - SIGNALING_SECRET=${SIGNALING_SECRET_KEY} # ADD YOUR SIGNALING SECRET KEY IN .env FILE
-        - TZ=${TIMEZONE} # ADD YOUR TIME ZONE IN .env. FILE
-        - TALK_PORT=3478
         - INTERNAL_SECRET=${INTERNAL_SECRET_KEY} # ADD YOUR INTERNAL SECRET KEY IN .env FILE
+        - TALK_PORT=3478
+      networks:
+        - frontend    
       labels:
         - 'traefik.enable=true'
         - 'traefik.http.routers.nextcloud-talk.tls=true'
@@ -143,8 +233,6 @@ services:
         - 'traefik.http.routers.nextcloud-talk.rule=Host(`${SIGNALING_DOMAIN}`)'
         - 'traefik.http.routers.nextcloud-talk.service=nextcloud-talk'
         - 'traefik.http.services.nextcloud-talk.loadbalancer.server.port=8081'
-      networks:
-        - frontend
 
 ## review config
 # docker compose exec app php occ config:system:get enabledPreviewProviders
@@ -166,71 +254,13 @@ services:
     imaginary:
         image: nextcloud/aio-imaginary:latest
         container_name: nextcloud-imaginary
+        restart: always
         environment:
             - PORT=9000
         command: -concurrency 50 -enable-url-source -log-level info
-        restart: always
         networks:
           - frontend
 
-    nextcloud-app:
-        build: .
-        container_name: nextcloud-app
-        restart: unless-stopped
-        gpus: all
-        depends_on:
-            - nextcloud-db
-            - nextcloud-redis
-        environment:
-            - REDIS_HOST=nextcloud-redis # REDIS CONTAINER NAME
-            - REDIS_HOST_PASSWORD=${REDIS_PASSWORD} # REPLACE WITH REDIS PASSWORD
-
-            - MYSQL_HOST=nextcloud-db # MYSQL DATABASE
-            - MYSQL_USER=nextcloud # MYSQL USERNAME
-            - MYSQL_PASSWORD=${MYSQL_PASSWORD} # PASSWORD OF MYSQL USER
-            - MYSQL_DATABASE=nextcloud # MYSQL DATABASE
-
-            - POSTGRES_HOST=nextcloud-pg
-            - POSTGRES_USER=nextcloud
-            - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-            - POSTGRES_DB=nextcloud
-
-            - TRUSTED_PROXIES=172.18.0.0/16 # CHANGE TO YOUR DOCKER NETWORK IP ADDRESS
-            - OVERWRITEPROTOCOL=https
-            # ALLOW UPLOAD OF BIG FILES
-            # IF YOU'RE USING REVERSE PROXY AS TRAEFIK CHANGE SETTINGS AND THERE 
-            - APACHE_BODY_LIMIT=0
-            - PHP_OPCACHE_MEMORY_CONSUMPTION=256
-            - PHP_UPLOAD_LIMIT=16G
-            - PHP_MEMORY_LIMIT=2G
-            - NEXTCLOUD_ENABLE_NVIDIA_GPU=true
-
-        volumes:
-            - ./nextcloud:/var/www/html
-        labels:
-            - 'traefik.enable=true'
-            - 'traefik.http.routers.nextcloud.tls=true'
-            - 'traefik.http.routers.nextcloud.tls.certresolver=production'
-            - 'traefik.http.routers.nextcloud.entrypoints=websecure'
-            - 'traefik.http.routers.nextcloud.rule=Host(`${NC_DOMAIN}`)'
-
-            - 'traefik.http.middlewares.nextcloud-dav.redirectRegex.regex=https://(.*)/.well-known/(card|cal)dav'
-            - 'traefik.http.middlewares.nextcloud-dav.redirectRegex.replacement=https://$${1}/remote.php/dav/'
-            - 'traefik.http.middlewares.nextcloud-dav.redirectRegex.permanent=true'
-
-            - 'traefik.http.middlewares.nextcloud-header.headers.referrerPolicy=no-referrer'
-            - 'traefik.http.middlewares.nextcloud-header.headers.browserXssFilter=true'
-            - 'traefik.http.middlewares.nextcloud-header.headers.customRequestHeaders.X-Forwarded-Proto=https'
-            
-            - 'traefik.http.middlewares.nextcloud-header.headers.stsSeconds=15552000'
-            - 'traefik.http.middlewares.nextcloud-header.headers.stsIncludeSubdomains=true'
-            - 'traefik.http.middlewares.nextcloud-header.headers.stsPreload=true'
-            - 'traefik.http.middlewares.nextcloud-header.headers.forceSTSHeader=true'
-
-            - 'traefik.http.routers.nextcloud.middlewares=nextcloud-dav,nextcloud-header@docker'
-
-        networks:
-            - frontend
 
 volumes:
     redis_data:

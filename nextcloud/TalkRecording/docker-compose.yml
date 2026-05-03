@@ -1,0 +1,41 @@
+---
+
+services:
+  nextcloud-talk-recording:
+    image: nextcloud/aio-talk-recording:latest
+    container_name: nextcloud-talk-recording
+    hostname: nextcloud-talk-recording
+    restart: unless-stopped
+    init: true
+    environment:
+      - NC_DOMAIN=${NC_DOMAIN}
+      - HPB_DOMAIN=${TALK_DOMAIN}
+      - TZ=Europe/Sofia
+      - RECORDING_SECRET=${RECORDING_SECRET_KEY}
+      - INTERNAL_SECRET=${INTERNAL_SECRET_KEY}
+    volumes:
+      - talk-recording:/tmp:rw
+    shm_size: 2147483648
+    ports:
+      - 1234:1234
+    cap_drop:
+      - NET_RAW
+    networks:
+      - frontend
+    labels:
+        - "traefik.enable=true"
+        - 'traefik.http.routers.talk-recording-router.tls=true'
+        - 'traefik.http.routers.talk-recording-router.tls.certresolver=production'
+        # HTTP Routers
+        - 'traefik.http.routers.talk-recording-router.entrypoints=websecure'
+        - "traefik.http.routers.talk-recording-router.rule=Host(`${TALK_RECORDING_DOMAIN}`)"
+        # HTTP Services
+        - "traefik.http.routers.talk-recording-router.service=talk-recording-service"
+        - "traefik.http.services.talk-recording-service.loadbalancer.server.port=1234"
+
+volumes:
+  talk-recording:
+ 
+networks:
+  frontend:
+    external: true # IF NETWORK ALLREADY EXISTS

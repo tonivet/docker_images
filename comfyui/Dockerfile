@@ -1,61 +1,59 @@
 # Base image with system dependencies
-FROM nvidia/cuda:12.0.1-base-ubuntu22.04 
+FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
 
 # Set environment variables to avoid tzdata prompts
 ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=Europe/Sofiia
+ENV TZ=Europe/Sofia
 
 # Install system dependencies
-RUN apt-get update && \
+RUN apt-get update --allow-releaseinfo-change && \
+    apt-get install -y software-properties-common && \
+    add-apt-repository universe && \
+    apt-get update && \
     apt-get install -y \
-    git curl build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev \
-    libsqlite3-dev wget llvm libncurses5-dev libncursesw5-dev xz-utils tk-dev \
-    libegl1-mesa libglvnd-dev libglvnd0 \
-    libffi-dev liblzma-dev python3-pip python3-venv tzdata && \
+        git \
+        curl \
+        wget \
+        vim \
+        ca-certificates \
+        build-essential \
+        python3 \
+        python3-pip \
+        python3-venv \
+        libgl1 \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender-dev \
+        libgomp1 \
+        tzdata && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user matching the host UID and GID
-ARG USER_ID=1000
-ARG GROUP_ID=1000
-RUN groupadd -g $GROUP_ID usergroup && \
-    useradd -m -u $USER_ID -g usergroup user && \
-    mkdir -p /home/user && \
-    chown -R user:usergroup /home/user
-
-# Switch to the non-root user
-USER user
-ENV HOME=/home/user
-ENV PATH=/home/user/.local/bin:$HOME/.pyenv/bin:$HOME/.pyenv/shims:$PATH
-
-# Install pyenv for Python management
-RUN curl https://pyenv.run | bash && \
-    eval "$(pyenv init --path)" && \
-    pyenv install 3.12.0 && \
-    pyenv global 3.12.0
+WORKDIR /app
 
 # Clone the ComfyUI repository
-WORKDIR /app
-RUN git clone https://github.com/comfyanonymous/ComfyUI.git . && \
-    chown -R user:usergroup /app
+RUN git clone https://github.com/comfyanonymous/ComfyUI.git .
 
 # Create a Python virtual environment and install dependencies
-RUN python3 -m venv venv && \
-    /app/venv/bin/pip install --upgrade pip && \
-    /app/venv/bin/pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 
+RUN python3 -m venv /app/venv && \
+    /app/venv/bin/pip install --upgrade pip
+
+RUN /app/venv/bin/pip install --pre \
+    torch torchvision torchaudio \
+    --index-url https://download.pytorch.org/whl/nightly/cu128
 
 # Install xformers
-RUN /app/venv/bin/pip install -U xformers --no-dependencies
+RUN /app/venv/bin/pip install -U xformers
 
-# Install Comfyui    
+# Install Comfyui
 RUN /app/venv/bin/pip install -r requirements.txt
-
-# Clone ComfyUI Manager into custom_nodes
-RUN mkdir -p /app/custom_nodes && \
-    git clone https://github.com/ltdrdata/ComfyUI-Manager.git /app/custom_nodes/ComfyUI-Manager
 
 # Expose ComfyUI internal port
 EXPOSE 8188
 
-# Command to start ComfyUI
-CMD ["/app/venv/bin/python3", "main.py", "--listen", "0.0.0.0", "--port", "8188"]
+# Check for previous installed coustom_nodes if not install ComfyUI-Manager else install previous installed custom nodes dependencies. Starts ComfyUI
+CMD [ ! -d /app/custom_nodes/ComfyUI-Manager ] && \
+    git clone https://github.com/ltdrdata/ComfyUI-Manager.git /app/custom_nodes/ComfyUI-Manager || true; \
+    find /app/custom_nodes -name requirements.txt -exec /app/venv/bin/pip install -r {} \; && \
+    exec /app/venv/bin/python3 main.py --listen 0.0.0.0 --port 8188

@@ -19,8 +19,11 @@ services:
               capabilities: [gpu]
     # runtime: nvidia  # Specify NVIDIA runtime
     volumes:
-      - ./models:/app/models  # Mount Docker volume for shared models - Make sure it exists, or remove 'external' in volumes section
-      - ./output:/app/output # Local WSL Folder - Make sure it exists!
+      - ./output:/app/output # Local directory - Make sure it exists!
+      - ./input:/app/input
+      - models:/app/models  # Mount Docker volume for shared models - Make sure it exists, or remove 'external' in volumes section
+      - custom_nodes:/app/custom_nodes
+      - user:/app/user
     labels:
       - traefik.enable=true
       - traefik.http.routers.comfyui.rule=Host(`comfy.feedmix.eu`)
@@ -32,7 +35,8 @@ services:
 
 volumes:
   models:
-    # external: true
+  custom_nodes:
+  user:
 
 networks:
   frontend:

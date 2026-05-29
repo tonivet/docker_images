@@ -1,0 +1,31 @@
+---
+
+services:
+  nextcloud-talk-recording:
+    build:
+      context: ./nextcloud-talk-recording
+      dockerfile: docker-compose/Dockerfile
+    init: true
+    shm_size: "2gb"
+    restart: on-failure
+    container_name: nextcloud-talk-recording
+    volumes:
+      - ./nextcloud-talk-recording/server.conf:/etc/nextcloud-talk-recording/server.conf:ro
+    networks:
+      - frontend
+    labels:
+        - "traefik.enable=true"
+        - 'traefik.http.routers.talk-recording-router.tls=true'
+        - 'traefik.http.routers.talk-recording-router.tls.certresolver=production'
+        # HTTP Routers
+        - 'traefik.http.routers.talk-recording-router.entrypoints=websecure'
+        - "traefik.http.routers.talk-recording-router.rule=Host(`${TALK_RECORDING_DOMAIN}`)"
+        # HTTP Services
+        - "traefik.http.routers.talk-recording-router.service=talk-recording-service"
+        - "traefik.http.services.talk-recording-service.loadbalancer.server.port=8000"
+
+
+networks:
+  frontend:
+    external: true
+

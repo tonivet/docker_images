@@ -5,13 +5,18 @@ django/
 models/
 mysql-data/
 nextcloud/nextcloud/
-output/
 piper-data/
 source/
 vw-data/
 whisper/
 whisper-data/
-.openclaw/
 elasticsearch/
 certs/
 notify_push_install/
+
+#comfyui
+comfyui/output/
+comfyui/input/
+
+#testing container
+.openclaw/

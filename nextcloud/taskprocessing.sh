@@ -1,4 +1,7 @@
 #!/bin/sh
 echo "Starting Nextcloud AI Worker $1"
 # this is needed if you want to use ollama as local AI agent for nextcloud. Without it AI will answer once in evry 5 minutes.
-php /var/www/html/occ background-job:worker -t 30 'OC\TaskProcessing\SynchronousBackgroundJob'
+while true; do
+  php /var/www/html/occ taskprocessing:worker -v -t 60
+  sleep 1
+done

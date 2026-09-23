@@ -8,6 +8,7 @@ services:
       - --cleanup
     # if you want to update only specific container/s write it here
       # - open-webui
+      # - ollama
     environment:
       - WATCHTOWER_RUN_ONCE=true # watchtower will start, udpate containers if there is any updates and exit
     volumes:

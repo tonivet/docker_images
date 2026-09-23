@@ -19,10 +19,13 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - frontend
+      - music
     restart: unless-stopped
 
 
 networks:
   frontend:
   # use this flag if network is allready created
+    external: true
+  music:
     external: true

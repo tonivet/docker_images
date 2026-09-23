@@ -20,3 +20,9 @@ comfyui/input/
 
 #testing container
 .openclaw/
+
+#lidarr
+lidar/
+appdata/
+navidrome/
+prowarr/

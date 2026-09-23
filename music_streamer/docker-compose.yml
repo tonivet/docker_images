@@ -1,0 +1,97 @@
+services:
+
+  lidarr:
+    image: lscr.io/linuxserver/lidarr:nightly
+    container_name: lidarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - ./lidarr/config:/config
+      - /home/antoni/Music/music:/data/music
+      - /home/antoni/Downloads/qbit:/data/downloads
+    networks:
+      - music
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=music
+      - traefik.http.routers.lidarr.rule=Host(`${LIDARR_DOMAIN}`)
+      - traefik.http.routers.lidarr.entrypoints=websecure
+      - traefik.http.routers.lidarr.tls=true
+      - traefik.http.routers.lidarr.tls.certresolver=production
+      - traefik.http.services.lidarr.loadbalancer.server.port=8686
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - ./prowlarr/config:/config
+    networks:
+      - music
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=music
+      - traefik.http.routers.prowlarr.rule=Host(`${PROWLARR_DOMAIN}`)
+      - traefik.http.routers.prowlarr.entrypoints=websecure
+      - traefik.http.routers.prowlarr.tls=true
+      - traefik.http.routers.prowlarr.tls.certresolver=production
+      - traefik.http.services.prowlarr.loadbalancer.server.port=9696
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - WEBUI_PORT=8080
+      - TORRENTING_PORT=6881
+    volumes:
+      - ./appdata:/config
+      - /home/antoni/Downloads/qbit:/data/downloads
+    networks:
+      - music
+    ports:
+      - "6881:6881"
+      - "6881:6881/udp"
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=music
+      - traefik.http.routers.qbittorrent.rule=Host(`${QBITTORRENT_DOMAIN}`)
+      - traefik.http.routers.qbittorrent.entrypoints=websecure
+      - traefik.http.routers.qbittorrent.tls=true
+      - traefik.http.routers.qbittorrent.tls.certresolver=production
+      - traefik.http.services.qbittorrent.loadbalancer.server.port=8080
+
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    environment:
+      ND_SCANSCHEDULE: 1h
+      ND_LOGLEVEL: info
+    volumes:
+      - ./navidrome/data:/data
+      - /home/antoni/Music/music:/music:ro
+    networks:
+      - music
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=music
+      - traefik.http.routers.navidrome.rule=Host(`${MUSIC_DOMAIN}`)
+      - traefik.http.routers.navidrome.entrypoints=websecure
+      - traefik.http.routers.navidrome.tls=true
+      - traefik.http.routers.navidrome.tls.certresolver=production
+      - traefik.http.services.navidrome.loadbalancer.server.port=4533
+
+networks:
+  music:
+    external: true

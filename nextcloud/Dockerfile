@@ -1,3 +1,5 @@
+# to upgrade use: sudo docker compose build --no-cache
+
 FROM nextcloud:latest
 
 # Install supervisor to start multiple processes on container startup
@@ -6,6 +8,7 @@ RUN apt-get update \
     && apt-get install -y  \
       supervisor \
       vim \
+      wget \
       ffmpeg \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*

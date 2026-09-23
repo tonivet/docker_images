@@ -2,9 +2,18 @@
 
 services:
     nextcloud-db:
-        image: mariadb:11.4
+        image: mariadb:latest
         container_name: nextcloud-db
-        command: --transaction-isolation=READ-COMMITTED --log-bin=ROW --skip-innodb-read-only-compressed --log_bin_trust_function_creators=true
+        command: 
+            - --transaction-isolation=READ-COMMITTED 
+            # - --log-bin=ROW 
+            - --skip-innodb-read-only-compressed 
+            - --log_bin_trust_function_creators=true 
+            - --slow-query-log=on
+            - --long-query-time=2
+            - --table-open-cache=4000
+            - --innodb-log-file-size=256M
+            - --table-open-cache=32000
         restart: unless-stopped
         volumes:
             - ./mysql-data:/var/lib/mysql
@@ -85,6 +94,7 @@ services:
             - NEXTCLOUD_ENABLE_NVIDIA_GPU=true
         volumes:
             - ./nextcloud:/var/www/html
+            - /home/antoni/Music/music:/mnt/media/Music
         networks:
             - frontend
         labels:
@@ -207,7 +217,7 @@ services:
 
     nextcloud-talk:
     #   image: nextcloud/aio-talk:latest
-      image: ghcr.io/nextcloud-releases/aio-talk:beta
+      image: ghcr.io/nextcloud-releases/aio-talk
       init: true
       container_name: nextcloud-talk
       hostname: nextcloud-talk

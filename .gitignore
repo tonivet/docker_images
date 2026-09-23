@@ -13,6 +13,7 @@ whisper-data/
 elasticsearch/
 certs/
 notify_push_install/
+nextcloud/rec/nextcloud-talk-recording
 
 #comfyui
 comfyui/output/

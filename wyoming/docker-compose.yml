@@ -6,7 +6,7 @@ services:
     ports:
       - 10200:10200
     volumes:
-      - "./piper-data:/data"
+      - piper-data:/data
     command: --voice en_US-lessac-medium
     restart: unless-stopped
     networks:
@@ -17,7 +17,7 @@ services:
     ports:
       - 10300:10300
     volumes:
-      - "./whisper-data:/data"
+      - whisper-data:/data
     restart: unless-stopped
     command: --model medium-int8 --language en  # --beam-size 5 --device cuda
     # deploy:
@@ -41,6 +41,10 @@ services:
     restart: unless-stopped
     networks:
       - wyoming
+
+volumes:
+  piper-data:
+  whisper-data:
 
 networks:
   wyoming:

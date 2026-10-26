@@ -1,0 +1,377 @@
+# this commands are ran on initial setup by configure-nextlouc.sh script in scripts directory
+# if you use docker hub image instead you should run it after install
+# php occ config:system:set default_phone_region --value=BG
+# php occ config:system:set maintenance_window_start --type=integer --value=3
+# php occ config:system:set serverid --value="nextcloud01"
+# php occ maintenance:repair --include-expensive
+
+services:
+  nextcloud:
+    # image: nextcloud
+    build: ./nc-docker
+    container_name: nc
+    restart: unless-stopped
+    gpus: all
+    depends_on:
+      - nc-db
+      - nc-redis
+    environment:
+      - NEXTCLOUD_ADMIN_USER=${NC_ADMIN_USER}
+      - NEXTCLOUD_ADMIN_PASSWORD=${NC_ADMIN_PASSWORD}
+      - NEXTCLOUD_TRUSTED_DOMAINS=${NC_DOMAIN}
+
+      # needed for initial setup script in nc-docker/sritps/init/configure-nextloud.sh
+      - NC_DEFAULT_PHONE_REGION=${NC_DEFAULT_PHONE_REGION:-BG}
+      - NC_MAINTENANCE_WINDOW_START=${NC_MAINTENANCE_WINDOW_START:-3}
+      - NC_SERVERID=${NC_SERVERID:-nextcloud01}
+      - NC_DOMAIN=${NC_DOMAIN}
+
+      - TRUSTED_PROXIES=172.22.0.0/16 # CHANGE TO YOUR DOCKER NETWORK IP ADDRESS
+      - OVERWRITEPROTOCOL=https
+
+      - APACHE_BODY_LIMIT=0
+      - PHP_OPCACHE_MEMORY_CONSUMPTION=256
+      - PHP_UPLOAD_LIMIT=16G
+      - PHP_MEMORY_LIMIT=2G
+
+      - POSTGRES_HOST=nc-db
+      - POSTGRES_DB=nextcloud
+      - POSTGRES_USER=nextclouduser
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+
+      - REDIS_HOST=nc-redis
+      - REDIS_HOST_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - nc_data:/var/www/html
+    networks:
+      - nextcloud
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nc.rule=Host(`${NC_DOMAIN}`)"
+      - "traefik.http.routers.nc.entrypoints=websecure"
+      - "traefik.http.routers.nc.tls=true"
+      - "traefik.http.routers.nc.tls.certresolver=production"
+      - "traefik.http.services.nc.loadbalancer.server.port=80"
+      # Nextcloud DAV redirect
+      # - 'traefik.http.middlewares.nc-dav.redirectRegex.regex=https://(.*)/.well-known/(card|cal)dav'
+      # - 'traefik.http.middlewares.nc-dav.redirectRegex.replacement=https://$${1}/remote.php/dav/'
+      # - 'traefik.http.middlewares.nc-dav.redirectRegex.permanent=true'
+      # HSTS
+      - "traefik.http.middlewares.nc-hsts.headers.stsSeconds=15552000"
+      - "traefik.http.middlewares.nc-hsts.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.nc-hsts.headers.stsPreload=true"
+      - "traefik.http.middlewares.nc-hsts.headers.forceSTSHeader=true"
+      # middleware for nextcloud
+      - "traefik.http.routers.nc.middlewares=nc-hsts"
+
+  nc-db:
+    image: postgres:17
+    container_name: nc-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=nextcloud
+      - POSTGRES_USER=nextclouduser
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - nc_db:/var/lib/postgresql/data
+    networks:
+      - nextcloud
+  
+  nc-redis:
+    image: redis:alpine
+    container_name: nc-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - nc_redis:/data
+    networks:
+      - nextcloud
+
+# The notify_push container provides a real-time push service that uses Redis to instantly notify Nextcloud clients (like browsers, mobile apps or pc apps) 
+# about changes (new files, messages, notifications, etc.) without the clients constantly polling the Nextcloud server.
+# before using the notify_push service, you need to install the notify_push app in your nextcloud instance. 
+# You can do this by running the following command in the nextcloud container:
+# php occ app:install notify_push or by downloading the app from the nextcloud app store and uploading it to your nextcloud instance.
+# after installing the app, and run the notify_push container, you need to enable it by running the following command in the nextcloud container:
+# php occ app:enable notify_push
+# php occ notify_push:setup https://${NC_DOMAIN}/push
+# if you are using a reverse proxy, you need to set the overwrite.cli.url to your nextcloud instance url with the following command in the nextcloud container:
+# php occ config:system:set overwrite.cli.url --value=https://${NC_DOMAIN}
+# for more information check https://github.com/nextcloud/notify_push
+
+  nc-notify-push:
+    image: nextcloud/aio-notify-push
+    container_name: nc-notify-push
+    restart: always
+    depends_on:
+      - nextcloud
+      - nc-db
+      - nc-redis
+    environment:
+      - NEXTCLOUD_URL=http://nc
+      - REDIS_HOST=nc-redis
+      - REDIS_HOST_PASSWORD=${REDIS_PASSWORD}
+      - PORT=7867
+    volumes:
+      - nc_data:/var/www/html:ro
+    networks:
+      - nextcloud
+    # entrypoint: >
+    #   /var/www/html/custom_apps/notify_push/bin/x86_64/notify_push
+    #   /var/www/html/config/config.php
+
+    # this entrypoint waits for install-notify-push.sh scritp to install notify-push app and then to run the container
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo "Waiting for Notify Push app installation..."
+        until [ -x /var/www/html/custom_apps/notify_push/bin/x86_64/notify_push ]; do
+          sleep 2
+        done
+        echo "Notify Push binary found; starting server..."
+        exec /var/www/html/custom_apps/notify_push/bin/x86_64/notify_push \
+          /var/www/html/config/config.php
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=nextcloud
+
+      - traefik.http.routers.nc_notify_push.tls=true
+      - traefik.http.routers.nc_notify_push.tls.certresolver=production
+      - traefik.http.routers.nc_notify_push.entrypoints=websecure
+
+      - traefik.http.routers.nc_notify_push.rule=Host(`${NC_DOMAIN}`) && PathPrefix(`/push`)
+      - traefik.http.routers.nc_notify_push.priority=1000
+      - traefik.http.routers.nc_notify_push.service=nc_notify_push
+
+      - traefik.http.routers.nc_notify_push.middlewares=nc_notify_push_strip
+      - traefik.http.middlewares.nc_notify_push_strip.stripprefix.prefixes=/push
+
+      - traefik.http.services.nc_notify_push.loadbalancer.server.port=7867
+
+  # before using the fulltextsearch service, you need to install the fulltextsearch app in your nextcloud instance.
+  # You can do this by downloading the app from the nextcloud app store or running the following command in the nextcloud container:
+  # php occ app:install fulltextsearch
+  # php occ app:install fulltextsearch_elasticsearch
+  # php occ app:install files_fulltextsearch
+  # after deploing the container, open admininistration settings -> fulltextsearch in elasticsearch address for Servlet,
+  # enter: http://nc-fulltext-search:9200
+  # test the configration with:
+  # php occ fulltextsearch:test
+  # run initial indexing:
+  # php occ fulltextsearch:index
+  # see the instructions here: https://github.com/nextcloud/fulltextsearch/wiki/Basic-Installation
+
+  fulltextsearch:
+    image: nextcloud/aio-fulltextsearch
+    container_name: nc-fulltext-search
+    restart: unless-stopped
+    environment:
+      - TZ=${TIMEZONE}
+      - ES_JAVA_OPTS=-Xms1G -Xmx1G # Allocates 1 GB RAM minimum and maximum to Elasticsearch.
+      - bootstrap.memory_lock=true
+      - cluster.name=nextcloud-aio
+      - discovery.type=single-node
+      - logger.org.elasticsearch.discovery=WARN
+      - http.port=9200
+      - xpack.license.self_generated.type=basic
+      - xpack.security.enabled=false
+    volumes:
+      - nc_elasticsearch:/usr/share/elasticsearch/data:rw
+    networks:
+      - nextcloud
+
+# # check for existing preview providers in your nextcloud instance.
+# # php occ preview:providers
+
+  nc-imaginary:
+    image: nextcloud/aio-imaginary:latest
+    container_name: nc-imaginary
+    restart: always
+    environment:
+      - PORT=9000
+    command: -concurrency 50 -enable-url-source -log-level info
+    networks:
+      - nextcloud
+
+  nc-harp:
+    image: ghcr.io/nextcloud/nextcloud-appapi-harp:release
+    container_name: nc-harp
+    hostname: nc-harp
+    restart: unless-stopped
+    depends_on:
+      - nextcloud
+    environment:
+      HP_SHARED_KEY: ${HP_SHARED_KEY}
+      NC_INSTANCE_URL: ${NC_DOMAIN}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - nc_certs:/certs
+    networks:
+      - nextcloud
+    labels:
+        - 'traefik.enable=true'
+    # AppAPI / HaRP 
+        - 'traefik.http.routers.nc-harp.rule=Host(`${NC_DOMAIN}`) && PathPrefix(`/exapps/`)'
+        - 'traefik.http.routers.nc-harp.priority=100'
+        - 'traefik.http.routers.nc-harp.entrypoints=websecure'
+        - 'traefik.http.routers.nc-harp.tls=true'
+        - 'traefik.http.routers.nc-harp.tls.certresolver=production'
+        - 'traefik.http.routers.nc-harp.service=nc-harp'
+        - 'traefik.http.services.nc-harp.loadbalancer.server.port=8780'
+
+
+#   # install nextcloud office app in your nextcloud instance, then run the following command in the nextcloud container:
+#   # in administration settings -> office, set the Document Server URL to: https://${EUROOFFICE_DOMAIN} and put the JWT_SECRET in secret key field.
+#   # see more on: https://github.com/Euro-Office/eurooffice-nextcloud
+
+  nc-eurooffice:
+    image: nextcloud/aio-eurooffice:20260929_105435
+    container_name: nc-eurooffice
+    restart: unless-stopped
+    environment:
+      - JWT_ENABLED=true
+      - JWT_SECRET=${JWT_SECRET}
+    volumes:
+      - nc_eurooffice_data:/var/lib/euro-office/documentserver
+      - nc_eurooffice_logs:/var/log/euro-office/documentserver
+      - nc_eurooffice_config:/etc/euro-office/documentserver
+    networks:
+      - nextcloud
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.eurooffice.rule=Host(`${EUROOFFICE_DOMAIN}`)"
+      - "traefik.http.routers.eurooffice.entrypoints=websecure"
+      - "traefik.http.routers.eurooffice.tls=true"
+      - "traefik.http.routers.eurooffice.tls.certresolver=production"
+      - "traefik.http.services.eurooffice.loadbalancer.server.port=80"
+      - "traefik.docker.network=nextcloud"
+
+# opensorce antivirus engine for detecting trojans, viruses, malware & other malicious threats
+# install "Antivirus for files" app. 
+# In Administration Settings -> Securty, change mode to: "Camav Daemon" and set the host to: "nc_clamav" and port to 3310. 
+# php occ files_antivirus:test
+# https://docs.nextcloud.com/server/stable/admin_manual/configuration_server/antivirus_configuration.html
+
+  nc-clamav:
+    image: clamav/clamav:stable_base
+    container_name: nc-clamav
+    volumes:
+      - nc_clamav:/var/lib/clamav/
+    restart: unless-stopped
+    networks:
+      - nextcloud
+
+# # install nextcloud whiteboard app in your nextcloud instance
+# # run the nc_whiteboard container.
+# # enter in administration settings -> whiteboard -> websocket url: https://${NC_DOMAIN}/whiteboard and set the JWT secret key.
+
+  nc-whiteboard:
+    image: nextcloud/aio-whiteboard
+    container_name: nc-whiteboard
+    restart: unless-stopped
+    depends_on:
+      - nextcloud
+    environment:
+      - NEXTCLOUD_URL=https://${NC_DOMAIN}
+      - JWT_SECRET_KEY=${WHITEBOARD_SECRET_KEY}
+      - STORAGE_STRATEGY=redis
+      - REDIS_HOST=nc-redis
+      - REDIS_HOST_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_USER=
+    networks:
+      - nextcloud
+    labels:
+      - "traefik.enable=true" 
+      - "traefik.docker.network=nextcloud" 
+      # Router 
+      - "traefik.http.routers.nc-whiteboard.rule=Host(`${NC_DOMAIN}`) && PathPrefix(`/whiteboard`)" 
+      - "traefik.http.routers.nc-whiteboard.entrypoints=websecure" 
+      - "traefik.http.routers.nc-whiteboard.tls=true" 
+      - "traefik.http.routers.nc-whiteboard.tls.certresolver=production" 
+      - "traefik.http.routers.nc-whiteboard.service=nc-whiteboard" 
+      # Remove /whiteboard before forwarding to the container 
+      - "traefik.http.middlewares.nc-whiteboard-strip.stripprefix.prefixes=/whiteboard" 
+      - "traefik.http.routers.nc-whiteboard.middlewares=nc-whiteboard-strip" 
+      # Whiteboard container 
+      - "traefik.http.services.nc-whiteboard.loadbalancer.server.port=3002"
+
+  nc-talk:
+    # image: nextcloud/aio-talk:latest
+    image: ghcr.io/nextcloud-releases/aio-talk:latest
+    init: true
+    container_name: nc-talk
+    hostname: nc-talk
+    restart: unless-stopped
+    ports:
+      - 3479:3478/tcp # MUST BE OPEN ON FIREWALL AND ROUTER
+      - 3479:3478/udp
+    environment:
+      - NC_DOMAIN=${NC_DOMAIN}
+      - TZ=${TIMEZONE}
+      - TALK_HOST=${NC_DOMAIN}/signaling
+      - TURN_SECRET=${TURN_SECRET_KEY}
+      - SIGNALING_SECRET=${SIGNALING_SECRET_KEY}
+      - INTERNAL_SECRET=${INTERNAL_SECRET_KEY}
+      - TALK_PORT=3478
+    networks:
+      - nextcloud    
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.nc-talk.tls=true
+      - traefik.http.routers.nc-talk.tls.certresolver=production
+      - traefik.http.routers.nc-talk.entrypoints=websecure
+      - traefik.http.routers.nc-talk.rule=Host(`${NC_DOMAIN}`) && PathPrefix(`/signaling`)
+      - traefik.http.routers.nc-talk.priority=100
+      - traefik.http.routers.nc-talk.service=nc-talk
+      - traefik.http.middlewares.nc-talk-strip.stripprefix.prefixes=/signaling
+      - traefik.http.routers.nc-talk.middlewares=nc-talk-strip
+      - traefik.http.services.nc-talk.loadbalancer.server.port=8081
+
+  nc-talk-recording:
+    image: ghcr.io/nextcloud-releases/aio-talk-recording:latest
+    container_name: nc-talk-recording
+    hostname: nc-talk-recording
+    restart: unless-stopped
+    init: true
+    environment:
+      - NC_DOMAIN=${NC_DOMAIN}
+      - HPB_DOMAIN=${NC_DOMAIN}/signaling
+      - TZ=${TIMEZONE}
+      - RECORDING_SECRET=${RECORDING_SECRET_KEY}
+      - INTERNAL_SECRET=${INTERNAL_SECRET_KEY}
+      - SIGNALING_SECRET=${SIGNALING_SECRET_KEY}
+    volumes:
+      - nc_talk_recording:/tmp:rw
+    shm_size: 2147483648
+    cap_drop:
+      - NET_RAW
+    networks:
+      - nextcloud
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.nc-talk-recording-router.entrypoints=websecure
+      - traefik.http.routers.nc-talk-recording-router.rule=Host(`${NC_DOMAIN}`) && PathPrefix(`/recording`)
+      - traefik.http.routers.nc-talk-recording-router.priority=100
+      - traefik.http.routers.nc-talk-recording-router.tls=true
+      - traefik.http.routers.nc-talk-recording-router.tls.certresolver=production
+      - traefik.http.routers.nc-talk-recording-router.service=nc-talk-recording-service
+      - traefik.http.routers.nc-talk-recording-router.middlewares=nc-talk-recording-strip
+      - traefik.http.middlewares.nc-talk-recording-strip.stripprefix.prefixes=/recording
+      - traefik.http.services.nc-talk-recording-service.loadbalancer.server.port=1234
+
+volumes:  
+  nc_data:
+  nc_db:
+  nc_redis:
+  nc_elasticsearch:
+  nc_certs:
+  nc_eurooffice_data:
+  nc_eurooffice_logs:
+  nc_eurooffice_config:
+  nc_clamav:
+  nc_talk_recording:
+
+networks:
+  nextcloud:
+    external: true

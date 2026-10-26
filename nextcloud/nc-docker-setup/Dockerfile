@@ -1,4 +1,4 @@
-# to upgrade use: sudo docker compose build --no-cache
+# to upgrade use: c
 
 FROM nextcloud:latest
 
@@ -17,8 +17,8 @@ RUN mkdir "/var/log/supervisord"
 RUN mkdir "/var/run/supervisord"
 
 COPY supervisord.conf /
-COPY --chmod=755 start_fulltextsearch_live.sh /
-COPY --chmod=755 taskprocessing.sh /
+COPY --chmod=755 scripts/start_fulltextsearch_live.sh /
+COPY --chmod=755 scripts/taskprocessing.sh /
 
 # The install and update script is only triggered when a default command is used (apache-foreground or php-fpm).
 # If you use a custom command you have to enable the install / update

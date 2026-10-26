@@ -20,12 +20,14 @@ services:
     networks:
       - frontend
       - music
+      - nextcloud
     restart: unless-stopped
 
 
 networks:
   frontend:
-  # use this flag if network is allready created
-    external: true
+    external: true   # use this flag if network is allready created
   music:
+    external: true
+  nextcloud:
     external: true

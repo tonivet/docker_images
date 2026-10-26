@@ -11,15 +11,20 @@ services:
       - DUPLICATI__WEBSERVICE_PASSWORD=${WEB_PASSWORD} # add key variable in .env file
       - CLI_ARGS= #optional
     volumes:
-      - ./config:/config
-      - ./backups:/backups
-      - /home/antoni/app_data:/source/app_data
-      - /var/lib/docker/volumes:/source/docker-volumes
+      - duplicati-config:/config
+      # backups directory
+      - /srv/docker/duplicati:/backups
+      # directories to backup
+      - ~/app_data:/source/app_data:ro
+      - /var/lib/docker/volumes:/source/docker-volumes:ro
     ports:
       - 8200:8200
     restart: unless-stopped
     networks: 
       - frontend
+
+volumes:
+  duplicati-config:
 
 networks:
   frontend:

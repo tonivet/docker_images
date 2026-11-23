@@ -1,0 +1,207 @@
+services:
+
+  lidarr:
+    image: lscr.io/linuxserver/lidarr:nightly
+    container_name: lidarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - ./lidarr/config:/config
+      - /home/antoni/Music/music:/data/music
+      - /home/antoni/Downloads/qbit:/data/downloads
+    networks:
+      - music
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=music
+      - traefik.http.routers.lidarr.rule=Host(`lidarr.${MUSIC_DOMAIN}`)
+      - traefik.http.routers.lidarr.entrypoints=websecure
+      - traefik.http.routers.lidarr.tls=true
+      - traefik.http.routers.lidarr.tls.certresolver=production
+      - traefik.http.services.lidarr.loadbalancer.server.port=8686
+      # crowdsec middleware
+      - "traefik.http.routers.lidarr.middlewares=crowdsec-bouncer@docker,crowdsec-appsec@file"
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - ./prowlarr/config:/config
+    networks:
+      - music
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=music
+      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.${MUSIC_DOMAIN}`)
+      - traefik.http.routers.prowlarr.entrypoints=websecure
+      - traefik.http.routers.prowlarr.tls=true
+      - traefik.http.routers.prowlarr.tls.certresolver=production
+      - traefik.http.services.prowlarr.loadbalancer.server.port=9696
+      # crowdsec middleware
+      - "traefik.http.routers.prowlarr.middlewares=crowdsec-bouncer@docker,crowdsec-appsec@file"
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - WEBUI_PORT=8080
+      - TORRENTING_PORT=6881
+    volumes:
+      - qbit-data:/config
+      - /home/antoni/Downloads/qbit:/data/downloads
+    networks:
+      - music
+    ports:
+      - "6881:6881"
+      - "6881:6881/udp"
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=music
+      - traefik.http.routers.qbittorrent.rule=Host(`qbit.${MUSIC_DOMAIN}`)
+      - traefik.http.routers.qbittorrent.entrypoints=websecure
+      - traefik.http.routers.qbittorrent.tls=true
+      - traefik.http.routers.qbittorrent.tls.certresolver=production
+      - traefik.http.services.qbittorrent.loadbalancer.server.port=8080
+      # crowdsec middleware
+      - "traefik.http.routers.qbittorrent.middlewares=crowdsec-bouncer@docker,crowdsec-appsec@file"
+
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    environment:
+      ND_SCANSCHEDULE: 1h
+      ND_LOGLEVEL: info
+      ND_LYRICSPRIORITY: ".ttml,.yaml,.yml,.elrc,.lrc,.srt,.txt,embedded,nd-lyrics"
+      ND_PLUGINS_ENABLED: "true"
+      ND_PLUGINS_AUTORELOAD: "true"
+      ND_AGENTS: "audiomuseai,lastfm,deezer"
+      ND_LASTFM_APIKEY: ${ND_LASTFM_APIKEY}
+      ND_LASTFM_SECRET: ${ND_LASTFM_SECRET}
+      ND_DEFAULTTHEME: "Spotify-ish"
+    volumes:
+      - ./navidrome/data:/data
+      - /home/antoni/Music/music:/music
+    networks:
+      - music
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=music
+      - traefik.http.routers.navidrome.rule=Host(`music.${MUSIC_DOMAIN}`)
+      - traefik.http.routers.navidrome.entrypoints=websecure
+      - traefik.http.routers.navidrome.tls=true
+      - traefik.http.routers.navidrome.tls.certresolver=production
+      - traefik.http.services.navidrome.loadbalancer.server.port=4533
+      # crowdsec middleware
+      - "traefik.http.routers.navidrome.middlewares=crowdsec-bouncer@docker,crowdsec-appsec@file"
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      TZ: ${AUDIOMUSE_TZ}
+      POSTGRES_USER: ${AUDIOMUSE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AUDIOMUSE_POSTGRES_PASSWORD}
+      POSTGRES_DB: audiomusedb
+    volumes:
+      - audiomuse-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d audiomusedb"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - music
+
+  audiomuse-ai-flask:
+    image: ghcr.io/neptunehub/audiomuse-ai:latest-nvidia
+    environment:
+      SERVICE_TYPE: flask
+      TZ: ${AUDIOMUSE_TZ:-Europe/Sofia}
+      POSTGRES_USER: ${AUDIOMUSE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AUDIOMUSE_POSTGRES_PASSWORD}
+      POSTGRES_DB: audiomusedb
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      TEMP_DIR: /app/temp_audio
+    ports:
+      - "8800:8000"
+    volumes:
+      - audiomuse-temp-flask:/app/temp_audio
+      - audiomuse-plugins-flask:/app/plugin/installed
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
+    networks:
+      - music
+    # labels:
+    #   - "traefik.enable=true"
+    #   - traefik.docker.network=music
+    #   - "traefik.http.routers.audiomuse.rule=Host(`audiomuse.${MUSIC_DOMAIN}`)"
+    #   - "traefik.http.routers.audiomuse.entrypoints=websecure"
+    #   - "traefik.http.routers.audiomuse.tls=true"
+    #   - "traefik.http.routers.audiomuse.tls.certresolver=production"
+    #   - "traefik.http.services.audiomuse.loadbalancer.server.port=8000"
+
+  audiomuse-ai-worker:
+    image: ghcr.io/neptunehub/audiomuse-ai:latest-nvidia
+    environment:
+      SERVICE_TYPE: worker
+      TZ: ${AUDIOMUSE_TZ}
+      POSTGRES_USER: ${AUDIOMUSE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${AUDIOMUSE_POSTGRES_PASSWORD}
+      POSTGRES_DB: audiomusedb
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      NVIDIA_VISIBLE_DEVICES: "0"
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      USE_GPU_CLUSTERING: ${AUDIOMUSE_USE_GPU_CLUSTERING:-true}
+      TEMP_DIR: /app/temp_audio
+    volumes:
+      - audiomuse-temp-worker:/app/temp_audio
+      - audiomuse-plugins-worker:/app/plugin/installed
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
+    networks:
+      - music
+
+volumes:
+  qbit-data:
+  audiomuse-postgres-data:
+  audiomuse-temp-flask:
+  audiomuse-temp-worker:
+  audiomuse-plugins-flask:
+  audiomuse-plugins-worker:
+
+networks:
+  music:
+    external: true

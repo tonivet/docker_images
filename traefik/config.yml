@@ -22,11 +22,11 @@ http:
         bouncer:
           enabled: true
           crowdsecLapiHost: crowdsec:8080
-          crowdsecLapiKey: "e2f4fabbfc827d96886341914aa9217410dbdb8ee10437275ba6e914fdc2867d"
+          crowdsecLapiKey: ${CROWDSEC_BOUNCER_KEY}
 
           crowdsecAppsecEnabled: true
           crowdsecAppsecHost: crowdsec:7422
-          crowdsecAppsecKey: "ajq80a56eEIUP35W3u73SEgNBBHC/p6wGQLCCAd6lsQ"
+          crowdsecAppsecKey: ${CROWDSEC_APP_BOUNCER_KEY}
 
           crowdsecAppsecFailureBlock: false
           crowdsecAppsecUnreachableBlock: false

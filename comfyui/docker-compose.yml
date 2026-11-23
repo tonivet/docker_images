@@ -32,6 +32,8 @@ services:
       - traefik.http.routers.comfyui.tls.certresolver=production
       - traefik.http.routers.comfyui.service=comfyui
       - traefik.http.services.comfyui.loadbalancer.server.port=8188  # Target internal port
+      # crowdsec middleware
+      - "traefik.http.routers.comfyui.middlewares=crowdsec-bouncer@docker,crowdsec-appsec@file"
 
 volumes:
   models:

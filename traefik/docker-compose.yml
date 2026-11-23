@@ -17,10 +17,21 @@ services:
       - ./config.yml:/etc/traefik/config.yml:ro
       - traefik-certificates:/ssl-certs
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /opt/traefik/logs:/var/log/traefik
     networks:
       - frontend
       - music
       - nextcloud
+    environment:
+      CROWDSEC_BOUNCER_KEY: ${CROWDSEC_BOUNCER_KEY}
+    labels:
+      - "traefik.enable=true"
+      # CrowdSec middleware
+      - "traefik.http.middlewares.crowdsec-bouncer.plugin.bouncer.enabled=true"
+      - "traefik.http.middlewares.crowdsec-bouncer.plugin.bouncer.crowdsecmode=stream"
+      - "traefik.http.middlewares.crowdsec-bouncer.plugin.bouncer.crowdseclapischeme=http"
+      - "traefik.http.middlewares.crowdsec-bouncer.plugin.bouncer.crowdseclapihost=crowdsec:8080"
+      - "traefik.http.middlewares.crowdsec-bouncer.plugin.bouncer.crowdseclapikey=${CROWDSEC_BOUNCER_KEY}"
     restart: unless-stopped
 
 

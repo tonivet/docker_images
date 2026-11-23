@@ -1,5 +1,5 @@
 # Base image with system dependencies
-FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
+FROM nvidia/cuda:13.4.3-cudnn-runtime-ubuntu24.04
 
 # Set environment variables to avoid tzdata prompts
 ENV DEBIAN_FRONTEND=noninteractive
@@ -41,7 +41,7 @@ RUN python3 -m venv /app/venv && \
 
 RUN /app/venv/bin/pip install --pre \
     torch torchvision torchaudio \
-    --index-url https://download.pytorch.org/whl/nightly/cu128
+    --index-url https://download.pytorch.org/whl/nightly/cu134
 
 # Install xformers
 RUN /app/venv/bin/pip install -U xformers

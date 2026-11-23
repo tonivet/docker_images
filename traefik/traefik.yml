@@ -3,7 +3,11 @@ global:
   sendAnonymousUsage: false
 
 log:
-  level: DEBUG
+  level: INFO
+
+accessLog:
+  filePath: "/var/log/traefik/access.log"
+  format: json
 
 api:
   dashboard: true
@@ -52,3 +56,11 @@ providers:
     network: frontend
   file:
     filename: /etc/traefik/config.yml
+
+# enables crowdsec plugin
+
+experimental:
+  plugins:
+    bouncer:
+      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      version: v1.8.1

@@ -1,0 +1,23 @@
+services:
+  piper_tts:
+    image: ghcr.io/matatonic/openedai-speech-min:latest
+    container_name: piper
+    # ports:
+    #   - "8000:8000"
+    volumes:
+      - ./voices:/app/voices
+      - ./config:/app/config
+    environment:
+      - TZ=Europe/Sofia
+      - TTS_HOME=/app/voices
+      - HF_HOME=/app/voices
+    restart: unless-stopped
+    networks:
+      - frontend
+
+networks:
+  frontend:
+    external: true
+
+# http://<IP-на-машината>:8000/v1
+# voice: dimitar

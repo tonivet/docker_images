@@ -1,0 +1,36 @@
+services:
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    container_name: crowdsec
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Sofia
+      COLLECTIONS: "crowdsecurity/traefik crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules"
+      APPSEC_CONFIGS: "crowdsecurity/appsec-default crowdsecurity/generic-rules crowdsecurity/virtual-patching"
+      BOUNCER_KEY_traefik: "${BOUNCER_KEY_TRAEFIK}"
+    volumes:
+      - ./config/acquis.d:/etc/crowdsec/acquis.d:ro
+      - /opt/traefik/logs:/var/log/traefik:ro # traefik logs written by traefik container in opt directory
+      - crowdsec-db:/var/lib/crowdsec/data
+      - crowdsec-config:/etc/crowdsec
+    networks:
+      - frontend
+      - music
+      - nextcloud
+      - home_page_default
+    labels:
+      - "traefik.enable=false"
+
+volumes:
+  crowdsec-db:
+  crowdsec-config:
+
+networks:
+  frontend:
+    external: true
+  music:
+    external: true
+  nextcloud:
+    external: true
+  home_page_default:
+    external: true

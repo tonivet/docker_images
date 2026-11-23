@@ -1,4 +1,4 @@
-# Nextcloud Docker Stack
+# Nextcloud Docker Stack behind Traefik Revese Proxy
 
 This project deploys Nextcloud with PostgreSQL and Redis, plus supporting services for push notifications, full-text search, previews, Office, Whiteboard, Talk, and other integrations. The Nextcloud image is built from the custom Dockerfile in `nc-docker/`.
 
@@ -17,6 +17,15 @@ docker network create nextcloud
 ```
 
 If Traefik uses a different Docker network, update the Compose network configuration and the services' `traefik.docker.network` labels to match.
+
+To allow uploading big files in Nextcloud you should add in your traefik entripoint. In this case websecure:
+
+```
+# allow uploding big files
+transport:
+  respondingTimeouts:
+    readTimeout: 24h
+```
 
 ## Configuration
 

@@ -27,3 +27,10 @@ lidar/
 appdata/
 navidrome/
 prowarr/
+
+#openwebui
+searxng/
+
+#piper
+voices/
+config/

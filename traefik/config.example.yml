@@ -1,0 +1,17 @@
+# configuration to add crowdsec Web Application Firewall - crowdsec AppSec
+
+http:
+  middlewares:
+    crowdsec-appsec:
+      plugin:
+        bouncer:
+          enabled: true
+          crowdsecLapiHost: crowdsec:8080
+          crowdsecLapiKey: YOUR_KEY
+
+          crowdsecAppsecEnabled: true
+          crowdsecAppsecHost: crowdsec:7422
+          crowdsecAppsecKey: YOUR_APPSEC_KEY
+
+          crowdsecAppsecFailureBlock: false
+          crowdsecAppsecUnreachableBlock: false

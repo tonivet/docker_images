@@ -34,3 +34,6 @@ searxng/
 #piper
 voices/
 config/
+
+# traefik
+traefik/config.yml
